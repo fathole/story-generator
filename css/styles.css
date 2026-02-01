@@ -1,0 +1,323 @@
+/* 自定義樣式 - 補充 Tailwind CSS */
+
+/* 全局樣式 */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* 頁面過渡動畫 */
+.page {
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 模態框動畫 */
+.modal-enter {
+    animation: modalEnter 0.2s ease-out;
+}
+
+@keyframes modalEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 項目卡片 */
+.project-card {
+    transition: all 0.2s ease;
+}
+
+.project-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 章節項目 */
+.chapter-item {
+    transition: all 0.15s ease;
+}
+
+.chapter-item:hover {
+    background-color: rgba(99, 102, 241, 0.1);
+}
+
+.chapter-item:hover .chapter-actions {
+    display: flex !important;
+}
+
+.chapter-item.active {
+    background-color: rgba(99, 102, 241, 0.2);
+    border-left: 3px solid #6366f1;
+}
+
+.chapter-item .chapter-actions button {
+    transition: all 0.15s ease;
+}
+
+.chapter-item .chapter-actions button:hover {
+    transform: scale(1.1);
+}
+
+/* 角色卡片 */
+.character-card {
+    transition: all 0.2s ease;
+}
+
+.character-card:hover {
+    background-color: #374151;
+}
+
+/* 生成中的動畫效果 */
+.generating {
+    position: relative;
+}
+
+.generating::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #6366f1, transparent);
+    animation: generating 1.5s linear infinite;
+}
+
+@keyframes generating {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* 打字機效果 */
+.typing-cursor::after {
+    content: '|';
+    animation: blink 0.7s infinite;
+}
+
+@keyframes blink {
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0;
+    }
+}
+
+/* Toast 通知 */
+.toast {
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast.hiding {
+    animation: slideOut 0.3s ease-out forwards;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/* 內容區域的排版 */
+#chapter-content p {
+    margin-bottom: 1rem;
+    line-height: 1.8;
+    text-indent: 2em;
+}
+
+#chapter-content h1,
+#chapter-content h2,
+#chapter-content h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    text-indent: 0;
+}
+
+/* 閱讀模式 */
+#read-content {
+    font-size: 1.1rem;
+    line-height: 2;
+}
+
+#read-content .chapter-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 3rem 0 2rem;
+    color: #e5e7eb;
+}
+
+#read-content p {
+    margin-bottom: 1.2rem;
+    text-indent: 2em;
+}
+
+/* 表單焦點樣式 */
+input:focus,
+textarea:focus,
+select:focus {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
+/* 按鈕禁用狀態 */
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 劇情選項按鈕 */
+.story-option {
+    transition: all 0.2s ease;
+}
+
+.story-option:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+}
+
+.story-option:active {
+    transform: translateY(0);
+}
+
+#story-options {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* 加載動畫 */
+.loader {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #6366f1;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 空狀態 */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #9ca3af;
+}
+
+.empty-state svg {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    opacity: 0.5;
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+    #page-write .flex {
+        flex-direction: column;
+    }
+
+    #page-write aside {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid #374151;
+    }
+
+    #chapter-list {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .chapter-item {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+}
+
+/* 深色模式下的選擇顏色 */
+::selection {
+    background-color: rgba(99, 102, 241, 0.4);
+    color: white;
+}
+
+/* 隱藏類 */
+.hidden {
+    display: none !important;
+}
+
+/* Flex 顯示 */
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 背景色補充 */
+.bg-gray-750 {
+    background-color: #2d3748;
+}
+
+.bg-gray-850 {
+    background-color: #1a202c;
+}
