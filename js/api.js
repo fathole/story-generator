@@ -7,7 +7,7 @@ class GeminiAPI {
     constructor() {
         this.apiKey = localStorage.getItem('gemini_api_key') || '';
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        this.generationModel = 'gemini-2.5-pro';
+        this.generationModel = 'gemini-3-pro-preview';
         this.embeddingModel = 'text-embedding-004';
     }
 
