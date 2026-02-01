@@ -176,6 +176,12 @@
                             <label class="block text-sm text-gray-400 mb-2">這章要發生什麼？</label>
                             <div class="flex gap-3">
                                 <input type="text" id="input-prompt" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-primary" placeholder="例：主角在森林中遇到神秘老人，獲得傳承...">
+                                <select id="select-writing-mode" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:border-primary text-sm" title="選擇寫作風格">
+                                    <option value="普通模式" title="平衡推動劇情，交代背景">普通模式</option>
+                                    <option value="重甜模式" title="專注於戀愛氛圍、肢體接觸">重甜模式</option>
+                                    <option value="熱血模式" title="專注於戰鬥、招式與速度感">熱血模式</option>
+                                    <option value="催淚模式" title="專注於情感宣洩與悲傷">催淚模式</option>
+                                </select>
                                 <button id="btn-generate" class="px-6 py-2 rounded-lg bg-primary hover:bg-secondary transition-colors flex items-center gap-2 whitespace-nowrap">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>

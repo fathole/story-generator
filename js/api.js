@@ -261,8 +261,8 @@ ${chapterContent.slice(-1500)}
                 maxTokens: 500
             });
 
-            // 解析 JSON
-            const jsonMatch = response.match(/\[[\s\S]*?\]/);
+            // 解析 JSON（使用貪婪匹配確保取得完整陣列）
+            const jsonMatch = response.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
                 const options = JSON.parse(jsonMatch[0]);
                 if (Array.isArray(options) && options.length > 0) {

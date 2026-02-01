@@ -690,11 +690,15 @@ class App {
         const streamingEl = document.getElementById('streaming-content');
 
         try {
+            // 獲取寫作模式
+            const writingMode = document.getElementById('select-writing-mode').value;
+
             // 構建 Prompt
             const fullPrompt = await memoryManager.buildGenerationPrompt(
                 this.currentProject.id,
                 prompt,
-                chapterNumber
+                chapterNumber,
+                writingMode
             );
 
             // 串流生成

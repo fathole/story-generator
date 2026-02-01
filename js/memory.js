@@ -9,6 +9,28 @@ class MemoryManager {
         this.recentChapterCount = 2;
         // 向量檢索數量
         this.retrievalCount = 5;
+        // 寫作模式說明
+        this.writingModes = {
+            "普通模式": `平衡推動劇情與角色發展。
+- 合理分配敘事、對話、描寫的比例
+- 適當交代場景與背景資訊
+- 保持穩定的敘事節奏`,
+            "重甜模式": `專注於戀愛氛圍與親密互動。
+- 細膩描寫角色間的眼神交流、小動作、肢體接觸
+- 營造心動、臉紅、心跳加速的氛圍
+- 對話要有曖昧感和情愫暗流
+- 善用內心獨白表現角色的悸動`,
+            "熱血模式": `專注於戰鬥場景與緊張氛圍。
+- 使用短句和快節奏描寫動作場面
+- 詳細描繪招式、技能、戰鬥策略
+- 營造緊迫感、壓迫感、腎上腺素飆升的氛圍
+- 強調力量碰撞、速度感、戰鬥意志`,
+            "催淚模式": `專注於情感渲染與悲傷氛圍。
+- 深入描寫角色的內心痛苦與掙扎
+- 善用回憶、對比手法加強情感衝擊
+- 細膩描繪眼淚、哽咽、無力感等情緒表現
+- 營造離別、失去、遺憾的氛圍`
+        };
     }
 
     /**
@@ -16,9 +38,10 @@ class MemoryManager {
      * @param {string} projectId - 項目 ID
      * @param {string} userPrompt - 用戶提示
      * @param {number} nextChapterNumber - 下一章章節號
+     * @param {string} writingMode - 寫作模式
      * @returns {Promise<string>} - 完整的 Prompt
      */
-    async buildGenerationPrompt(projectId, userPrompt, nextChapterNumber) {
+    async buildGenerationPrompt(projectId, userPrompt, nextChapterNumber, writingMode = '普通模式') {
         // 獲取項目信息
         const project = await storage.getProject(projectId);
         if (!project) {
@@ -50,8 +73,11 @@ class MemoryManager {
             }
         }
 
+        // 獲取寫作模式說明
+        const modeDescription = this.writingModes[writingMode] || this.writingModes['普通模式'];
+
         // 組合完整 Prompt
-        const prompt = `你是一位專業的網絡小說作家。請根據以下設定和上下文，續寫故事的下一章。
+        const prompt = `你是一位專業的網絡小說作家，擅長撰寫引人入勝的長篇故事。請根據以下設定和上下文，續寫故事的下一章。
 
 ## 故事設定
 ${coreSettings}
@@ -61,23 +87,39 @@ ${characterSection || '（尚未設定角色）'}
 
 ## 之前的情節摘要
 ${summarySection || '（這是第一章）'}
+${retrievedSection ? `\n## 相關的歷史情節（可作為參考）\n${retrievedSection}` : ''}
 
-${retrievedSection ? `## 相關的歷史情節（可作為參考）\n${retrievedSection}\n` : ''}
 ## 最近的章節內容
 ${recentSection || '（這是第一章）'}
 
-## 本章提示
-${userPrompt || '自由發揮，承接上文繼續推進劇情'}
+## 本章劇情方向
+${userPrompt || '自由發揮，承接上文自然推進劇情'}
 
-請續寫第 ${nextChapterNumber} 章（約 2000-3000 字），注意：
-1. 保持人物性格一致
-2. 劇情要與之前的伏筆呼應
-3. 使用生動的描寫和對話
-4. 章節結尾自然收束，不要強行添加意外事件或突發狀況
-5. 以繁體中文撰寫
-6. 直接輸出章節內容，不要加任何說明或標題
+## 寫作模式：${writingMode}
+${modeDescription}
 
-第${nextChapterNumber}章`;
+---
+
+請續寫第 ${nextChapterNumber} 章，要求如下：
+
+【基本要求】
+- 字數約 2000-3000 字
+- 以繁體中文撰寫
+- 直接輸出章節內容，不要加標題、說明或任何前後綴
+
+【劇情要求】
+- 保持角色性格與說話方式的一致性
+- 承接前文的伏筆與情節線索
+- 章節結尾自然收束，避免強行製造懸念或突發事件
+- 劇情發展要合理，不要跳躍或遺漏重要過渡
+
+【寫作技巧】
+- 善用「展示而非告知」的手法，透過行動和對話呈現角色特質
+- 對話要自然生動，符合角色身份與個性
+- 場景描寫要有畫面感，但不過度冗長
+- 按照「${writingMode}」的風格要求調整敘事重點與氛圍
+
+第${nextChapterNumber}章正文：`;
 
         return prompt;
     }
@@ -155,9 +197,9 @@ ${userPrompt || '自由發揮，承接上文繼續推進劇情'}
         const recentChapters = chapters.slice(-this.recentChapterCount);
 
         return recentChapters.map(ch => {
-            // 限制每章的長度，避免 prompt 過長
+            // 限制每章的長度，避免 prompt 過長（保留最後部分以維持連貫性）
             const content = ch.content.length > 3000
-                ? ch.content.slice(-3000) + '...'
+                ? '...' + ch.content.slice(-3000)
                 : ch.content;
 
             return `【第${ch.chapterNumber}章】\n${content}`;
