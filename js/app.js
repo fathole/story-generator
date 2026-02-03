@@ -62,6 +62,7 @@ class App {
         document.getElementById('project-form').addEventListener('submit', (e) => this.handleSaveProject(e));
         document.getElementById('btn-cancel-settings').addEventListener('click', () => this.handleBack());
         document.getElementById('btn-add-character').addEventListener('click', () => this.showCharacterModal(null));
+        document.getElementById('btn-regenerate-memory').addEventListener('click', () => this.handleRegenerateMemory());
 
         // 角色模態框
         document.getElementById('character-form').addEventListener('submit', (e) => this.handleSaveCharacter(e));
@@ -289,6 +290,9 @@ class App {
         // 載入角色
         this.tempCharacters = [];
 
+        // 隱藏記憶區塊（新建時）
+        document.getElementById('memory-section').classList.add('hidden');
+
         if (projectId) {
             // 編輯現有項目
             const project = await storage.getProject(projectId);
@@ -301,9 +305,140 @@ class App {
 
             // 載入角色
             this.tempCharacters = await storage.getCharactersByProject(projectId);
+
+            // 載入並顯示記憶（章節摘要）
+            await this.loadMemorySection(projectId);
         }
 
         this.renderCharacterList();
+    }
+
+    /**
+     * 載入記憶區塊（章節摘要）
+     */
+    async loadMemorySection(projectId) {
+        const memorySection = document.getElementById('memory-section');
+        const memoryList = document.getElementById('memory-list');
+        const memoryCount = document.getElementById('memory-count');
+
+        // 獲取章節
+        const chapters = await storage.getChaptersByProject(projectId);
+
+        if (chapters.length === 0) {
+            memorySection.classList.add('hidden');
+            return;
+        }
+
+        // 顯示記憶區塊
+        memorySection.classList.remove('hidden');
+
+        // 統計有摘要的章節數
+        const chaptersWithSummary = chapters.filter(ch => ch.summary);
+        memoryCount.textContent = `${chaptersWithSummary.length}/${chapters.length} 章有摘要`;
+
+        // 渲染記憶列表
+        memoryList.innerHTML = '';
+
+        for (const chapter of chapters) {
+            const item = document.createElement('div');
+            item.className = 'bg-gray-700 rounded-lg p-3';
+
+            const summary = chapter.summary || '（尚未生成摘要）';
+            const hasSummary = !!chapter.summary;
+
+            item.innerHTML = `
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-medium text-sm">${chapter.title || '第' + chapter.chapterNumber + '章'}</span>
+                    <span class="text-xs ${hasSummary ? 'text-green-400' : 'text-gray-500'}">${hasSummary ? '已記憶' : '未記憶'}</span>
+                </div>
+                <p class="text-xs text-gray-400 line-clamp-3">${ui.escapeHtml(summary)}</p>
+            `;
+
+            memoryList.appendChild(item);
+        }
+    }
+
+    /**
+     * 重新生成所有章節的記憶（摘要）
+     */
+    async handleRegenerateMemory() {
+        if (!this.editingProjectId) {
+            ui.toast('找不到項目', 'error');
+            return;
+        }
+
+        // 檢查 API Key
+        if (!geminiAPI.hasApiKey()) {
+            const key = await ui.showApiKeyModal();
+            if (key) {
+                geminiAPI.setApiKey(key);
+            } else {
+                return;
+            }
+        }
+
+        const confirmed = await ui.confirm(
+            '重新生成記憶',
+            '將為所有章節重新生成摘要，這可能需要一些時間。\n\n確定要繼續嗎？'
+        );
+        if (!confirmed) return;
+
+        const chapters = await storage.getChaptersByProject(this.editingProjectId);
+        if (chapters.length === 0) {
+            ui.toast('沒有章節需要處理', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btn-regenerate-memory');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = 0; i < chapters.length; i++) {
+            const chapter = chapters[i];
+
+            // 更新按鈕顯示進度
+            btn.innerHTML = `
+                <div class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                處理中 ${i + 1}/${chapters.length}
+            `;
+
+            try {
+                // 生成摘要
+                if (chapter.content && chapter.content.length > 100) {
+                    const summary = await geminiAPI.generateSummary(chapter.content);
+                    if (summary) {
+                        await storage.updateChapter(chapter.id, { summary });
+                        successCount++;
+                    }
+                }
+
+                // 建立向量索引
+                await vectorSearch.indexChapter(this.editingProjectId, chapter.id, chapter.content);
+
+                // 避免 API 限制
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+            } catch (e) {
+                console.error(`Error processing chapter ${chapter.chapterNumber}:`, e);
+                errorCount++;
+            }
+        }
+
+        // 恢復按鈕
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+
+        // 重新載入記憶區塊
+        await this.loadMemorySection(this.editingProjectId);
+
+        if (errorCount > 0) {
+            ui.toast(`完成！成功 ${successCount} 章，失敗 ${errorCount} 章`, 'warning');
+        } else {
+            ui.toast(`已成功生成 ${successCount} 章的記憶`, 'success');
+        }
     }
 
     /**
@@ -555,7 +690,7 @@ class App {
 
         const confirmed = await ui.confirm(
             '確認刪除',
-            `確定要刪除「${chapter.title || '第' + chapter.chapterNumber + '章'}」嗎？此操作無法復原。`
+            `確定要刪除「${chapter.title || '第' + chapter.chapterNumber + '章'}」嗎？\n\n⚠️ 章節內容將被刪除\n⚠️ 該章節的記憶也會被清除\n⚠️ 此操作無法復原\n\n💡 提示：如果只是不喜歡內容，建議使用「重寫」功能`
         );
         if (!confirmed) return;
 
@@ -588,7 +723,7 @@ class App {
 
         const confirmed = await ui.confirm(
             '確認重寫',
-            `確定要重寫「${chapter.title || '第' + chapter.chapterNumber + '章'}」嗎？原內容將被覆蓋。`
+            `確定要重寫「${chapter.title || '第' + chapter.chapterNumber + '章'}」嗎？\n\n⚠️ 原內容將被覆蓋\n✓ 章節編號保持不變\n✓ 記憶會重新建立（不會遺失整體劇情脈絡）`
         );
         if (!confirmed) return;
 
@@ -614,8 +749,14 @@ class App {
         // 顯示提示
         document.getElementById('chapter-content').innerHTML = `
             <div class="text-center py-12">
-                <p class="text-yellow-400 mb-2">準備重寫：${chapter.title || '第' + chapter.chapterNumber + '章'}</p>
-                <p class="text-gray-500">輸入新的章節提示後點擊「重寫章節」</p>
+                <div class="text-yellow-400 mb-4">
+                    <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    準備重寫：${chapter.title || '第' + chapter.chapterNumber + '章'}
+                </div>
+                <p class="text-gray-400 mb-2">輸入新的章節提示後點擊「重寫章節」</p>
+                <p class="text-gray-500 text-sm">原提示：${chapter.prompt || '（無）'}</p>
             </div>
         `;
 
@@ -799,10 +940,16 @@ class App {
         storyOptions.classList.remove('hidden');
         optionsContainer.innerHTML = '';
         optionsLoading.classList.remove('hidden');
+        optionsLoading.innerHTML = `
+            <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+            正在生成選項...
+        `;
 
         try {
             // 獲取角色
             const characters = await storage.getCharactersByProject(this.currentProject.id);
+
+            console.log('Generating story options...');
 
             // 生成選項
             const options = await geminiAPI.generateStoryOptions(
@@ -812,15 +959,35 @@ class App {
                 characters
             );
 
+            console.log('Generated options:', options);
+
             // 渲染選項按鈕
             optionsLoading.classList.add('hidden');
+
+            // 檢查是否為預設選項
+            const defaultOptions = geminiAPI.getDefaultOptions();
+            const isDefault = options.length === defaultOptions.length &&
+                options.every((opt, i) => opt === defaultOptions[i]);
+
+            if (isDefault) {
+                ui.toast('選項生成失敗，顯示預設選項（查看 Console 了解詳情）', 'warning');
+            }
+
             this.renderStoryOptions(options);
 
         } catch (e) {
             console.error('Generate options error:', e);
             optionsLoading.classList.add('hidden');
-            // 顯示預設選項
-            this.renderStoryOptions(geminiAPI.getDefaultOptions());
+
+            // 顯示錯誤訊息在選項區域
+            optionsContainer.innerHTML = `
+                <div class="col-span-2 text-center py-4 text-red-400">
+                    <p class="mb-2">選項生成失敗：${e.message}</p>
+                    <button onclick="app.generateStoryOptions(app.currentChapter.content)" class="text-sm text-primary hover:underline">點擊重試</button>
+                </div>
+            `;
+
+            ui.toast('選項生成失敗：' + e.message, 'error');
         }
     }
 

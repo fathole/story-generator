@@ -72,7 +72,8 @@ class UI {
             const okBtn = document.getElementById('btn-confirm-ok');
 
             titleEl.textContent = title;
-            messageEl.textContent = message;
+            // 支援多行訊息，將 \n 轉換為 <br>
+            messageEl.innerHTML = this.escapeHtml(message).replace(/\n/g, '<br>');
 
             const cleanup = () => {
                 modal.classList.add('hidden');
@@ -110,7 +111,17 @@ class UI {
             const cancelBtn = document.getElementById('btn-cancel-apikey');
             const saveBtn = document.getElementById('btn-save-apikey');
 
+            // 模型選擇器
+            const storyModelSelect = document.getElementById('select-model-story');
+            const optionsModelSelect = document.getElementById('select-model-options');
+            const memoryModelSelect = document.getElementById('select-model-memory');
+
+            // 載入現有設定
             input.value = geminiAPI.getApiKey() || '';
+            const models = geminiAPI.getModels();
+            storyModelSelect.value = models.story;
+            optionsModelSelect.value = models.options;
+            memoryModelSelect.value = models.memory;
 
             const cleanup = () => {
                 modal.classList.add('hidden');
@@ -127,6 +138,13 @@ class UI {
             const handleSave = () => {
                 const key = input.value.trim();
                 if (key) {
+                    // 儲存模型設定
+                    geminiAPI.setModels(
+                        storyModelSelect.value,
+                        optionsModelSelect.value,
+                        memoryModelSelect.value
+                    );
+
                     cleanup();
                     resolve(key);
                 } else {
@@ -245,12 +263,12 @@ class UI {
                 <span class="truncate flex-1">${chapter.title || `第${chapter.chapterNumber}章`}</span>
                 <span class="text-xs text-gray-500">${Math.floor(chapter.content.length / 1000)}k</span>
                 <div class="chapter-actions hidden flex gap-1">
-                    <button type="button" class="btn-rewrite-chapter p-1 text-gray-400 hover:text-yellow-400" data-id="${chapter.id}" title="重寫">
+                    <button type="button" class="btn-rewrite-chapter p-1 text-gray-400 hover:text-yellow-400" data-id="${chapter.id}" title="重寫章節（保留編號，重新生成內容）">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
                     </button>
-                    <button type="button" class="btn-delete-chapter p-1 text-gray-400 hover:text-red-400" data-id="${chapter.id}" title="刪除">
+                    <button type="button" class="btn-delete-chapter p-1 text-gray-400 hover:text-red-400" data-id="${chapter.id}" title="刪除章節（會清除記憶）">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
