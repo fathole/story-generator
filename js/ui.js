@@ -19,9 +19,13 @@ class UI {
      * 顯示 Toast 通知
      * @param {string} message - 訊息內容
      * @param {string} type - 類型：success, error, warning, info
-     * @param {number} duration - 持續時間（毫秒）
+     * @param {number} duration - 持續時間（毫秒），如果為 0 則根據訊息長度自動計算
      */
-    toast(message, type = 'info', duration = 3000) {
+    toast(message, type = 'info', duration = 0) {
+        // 根據訊息長度自動計算顯示時間（最少 3 秒，每 50 字加 1 秒，最多 10 秒）
+        if (duration === 0) {
+            duration = Math.min(10000, Math.max(3000, Math.floor(message.length / 50) * 1000 + 3000));
+        }
         const colors = {
             success: 'bg-green-600',
             error: 'bg-red-600',
@@ -37,11 +41,15 @@ class UI {
         };
 
         const toast = document.createElement('div');
-        toast.className = `toast ${colors[type]} px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 text-white max-w-sm`;
+        // 支援多行訊息時使用較寬的 toast
+        const isMultiLine = message.includes('\n');
+        toast.className = `toast ${colors[type]} px-4 py-3 rounded-lg shadow-lg flex items-start gap-3 text-white ${isMultiLine ? 'max-w-md' : 'max-w-sm'}`;
+        // 將 \n 轉換為 <br> 支援多行訊息
+        const formattedMessage = this.escapeHtml(message).replace(/\n/g, '<br>');
         toast.innerHTML = `
-            ${icons[type]}
-            <span class="flex-1">${message}</span>
-            <button class="opacity-70 hover:opacity-100" onclick="this.parentElement.remove()">
+            <div class="flex-shrink-0 mt-0.5">${icons[type]}</div>
+            <span class="flex-1 text-sm">${formattedMessage}</span>
+            <button class="opacity-70 hover:opacity-100 flex-shrink-0" onclick="this.parentElement.remove()">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>

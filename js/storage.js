@@ -476,13 +476,20 @@ class Storage {
     // ==================== 數據備份 ====================
 
     /**
-     * 匯出所有數據
+     * 匯出所有數據（包含設定）
      */
     async exportAllData() {
         const projects = await this.getAllProjects();
         const allData = {
-            version: 1,
+            version: 2,  // 升級版本號
             exportedAt: Date.now(),
+            // 匯出設定（API Key 可選，模型設定必須）
+            settings: {
+                gemini_api_key: localStorage.getItem('gemini_api_key') || '',
+                gemini_model_story: localStorage.getItem('gemini_model_story') || 'gemini-2.5-flash-lite',
+                gemini_model_options: localStorage.getItem('gemini_model_options') || 'gemini-2.5-flash-lite',
+                gemini_model_memory: localStorage.getItem('gemini_model_memory') || 'gemini-2.5-flash-lite'
+            },
             projects: []
         };
 
@@ -506,10 +513,45 @@ class Storage {
      * 匯入數據
      * @param {object} data - 匯入的數據
      * @param {boolean} merge - 是否合併（true=合併，false=覆蓋）
+     * @param {object} options - 匯入選項
+     * @returns {object} - 匯入結果詳情
      */
-    async importData(data, merge = false) {
+    async importData(data, merge = false, options = {}) {
         if (!data || !data.projects) {
             throw new Error('無效的數據格式');
+        }
+
+        const result = {
+            projectsImported: 0,
+            projectsSkipped: 0,
+            settingsImported: false,
+            embeddingsImported: 0,
+            embeddingsFailed: 0,
+            errors: []
+        };
+
+        // 匯入設定（如果有且用戶同意）
+        if (data.settings && options.importSettings !== false) {
+            try {
+                // 匯入 API Key（如果有且不為空）
+                if (data.settings.gemini_api_key && options.importApiKey !== false) {
+                    localStorage.setItem('gemini_api_key', data.settings.gemini_api_key);
+                }
+                // 匯入模型設定
+                if (data.settings.gemini_model_story) {
+                    localStorage.setItem('gemini_model_story', data.settings.gemini_model_story);
+                }
+                if (data.settings.gemini_model_options) {
+                    localStorage.setItem('gemini_model_options', data.settings.gemini_model_options);
+                }
+                if (data.settings.gemini_model_memory) {
+                    localStorage.setItem('gemini_model_memory', data.settings.gemini_model_memory);
+                }
+                result.settingsImported = true;
+            } catch (e) {
+                console.error('Settings import error:', e);
+                result.errors.push('設定匯入失敗');
+            }
         }
 
         // 如果不是合併模式，先清空所有數據
@@ -517,13 +559,12 @@ class Storage {
             await this.clearAllData();
         }
 
-        let importedCount = 0;
-
         for (const item of data.projects) {
             try {
                 // 檢查數據完整性
                 if (!item.project || !item.project.id) {
                     console.warn('跳過無效項目');
+                    result.errors.push('跳過無效項目');
                     continue;
                 }
 
@@ -537,25 +578,35 @@ class Storage {
 
                 if (existing && merge) {
                     // 合併模式下跳過已存在的項目
+                    result.projectsSkipped++;
                     continue;
                 }
 
                 // 使用單一事務匯入項目相關的所有數據
-                await this.importProjectData(item);
+                const embeddingResult = await this.importProjectData(item);
+                result.embeddingsImported += embeddingResult.embeddingsImported;
+                result.embeddingsFailed += embeddingResult.embeddingsFailed;
 
-                importedCount++;
+                result.projectsImported++;
             } catch (e) {
                 console.error('Import project error:', e);
+                result.errors.push(`項目 "${item.project?.title || '未知'}" 匯入失敗`);
             }
         }
 
-        return importedCount;
+        return result;
     }
 
     /**
      * 匯入單個項目的數據
+     * @returns {object} - 匯入結果
      */
     async importProjectData(item) {
+        const result = {
+            embeddingsImported: 0,
+            embeddingsFailed: 0
+        };
+
         // 匯入項目
         await new Promise((resolve, reject) => {
             const tx = this.db.transaction('projects', 'readwrite');
@@ -591,7 +642,7 @@ class Storage {
             });
         }
 
-        // 匯入向量（可選，如果太大可以跳過）
+        // 匯入向量（記錄成功/失敗數量）
         if (item.embeddings && item.embeddings.length > 0) {
             try {
                 await new Promise((resolve, reject) => {
@@ -603,11 +654,15 @@ class Storage {
                     tx.oncomplete = () => resolve();
                     tx.onerror = () => reject(tx.error);
                 });
+                result.embeddingsImported = item.embeddings.length;
             } catch (e) {
-                // 向量匯入失敗不阻斷整個流程
+                // 向量匯入失敗，記錄數量
                 console.warn('向量匯入失敗，將在生成時重建', e);
+                result.embeddingsFailed = item.embeddings.length;
             }
         }
+
+        return result;
     }
 
     /**

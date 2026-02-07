@@ -1103,7 +1103,7 @@ class App {
     // ==================== 數據備份 ====================
 
     /**
-     * 匯出所有數據
+     * 匯出所有數據（包含設定）
      */
     async handleExportAllData() {
         try {
@@ -1114,6 +1114,16 @@ class App {
             if (data.projects.length === 0) {
                 ui.toast('沒有可匯出的數據', 'warning');
                 return;
+            }
+
+            // 統計資訊
+            let totalChapters = 0;
+            let totalCharacters = 0;
+            let totalEmbeddings = 0;
+            for (const item of data.projects) {
+                totalChapters += item.chapters?.length || 0;
+                totalCharacters += item.characters?.length || 0;
+                totalEmbeddings += item.embeddings?.length || 0;
             }
 
             // 創建下載
@@ -1128,7 +1138,9 @@ class App {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            ui.toast(`已匯出 ${data.projects.length} 個作品`, 'success');
+            // 顯示詳細訊息
+            const hasApiKey = data.settings?.gemini_api_key ? '是' : '否';
+            ui.toast(`已匯出完整備份：${data.projects.length} 個作品、${totalChapters} 章、${totalCharacters} 角色、API設定${hasApiKey ? '已' : '未'}包含`, 'success');
         } catch (e) {
             console.error('Export error:', e);
             ui.toast('匯出失敗', 'error');
@@ -1136,7 +1148,7 @@ class App {
     }
 
     /**
-     * 匯入數據
+     * 匯入數據（包含設定）
      */
     async handleImportData(e) {
         const file = e.target.files[0];
@@ -1172,17 +1184,75 @@ class App {
                 return;
             }
 
+            // 統計備份內容
+            let totalChapters = 0;
+            let totalCharacters = 0;
+            for (const item of data.projects) {
+                totalChapters += item.chapters?.length || 0;
+                totalCharacters += item.characters?.length || 0;
+            }
+
+            // 檢查是否包含設定
+            const hasSettings = !!data.settings;
+            const hasApiKey = hasSettings && !!data.settings.gemini_api_key;
+
+            // 構建確認訊息
+            let confirmMessage = `備份內容：\n`;
+            confirmMessage += `• ${data.projects.length} 個作品\n`;
+            confirmMessage += `• ${totalChapters} 個章節\n`;
+            confirmMessage += `• ${totalCharacters} 個角色\n`;
+            if (hasSettings) {
+                confirmMessage += `• 模型設定：已包含\n`;
+                confirmMessage += `• API Key：${hasApiKey ? '已包含' : '未包含'}\n`;
+            }
+            confirmMessage += `\n選擇匯入模式：\n`;
+            confirmMessage += `「確認」= 合併（保留現有數據）\n`;
+            confirmMessage += `「取消」= 覆蓋（清空現有數據）`;
+
             // 詢問匯入模式
-            const merge = await ui.confirm(
-                '選擇匯入模式',
-                `檔案包含 ${data.projects.length} 個作品。\n\n點擊「確認」= 合併（保留現有數據）\n點擊「取消」= 覆蓋（清空現有數據）`
-            );
+            const merge = await ui.confirm('選擇匯入模式', confirmMessage);
+
+            // 詢問是否匯入 API Key（如果有）
+            let importApiKey = false;
+            if (hasApiKey) {
+                importApiKey = await ui.confirm(
+                    '匯入 API Key？',
+                    '備份檔案包含 API Key。\n\n「確認」= 使用備份的 API Key\n「取消」= 保留現有 API Key'
+                );
+            }
 
             ui.toast('正在匯入數據...', 'info');
 
-            const count = await storage.importData(data, merge);
+            // 執行匯入
+            const result = await storage.importData(data, merge, {
+                importSettings: hasSettings,
+                importApiKey: importApiKey
+            });
 
-            ui.toast(`已匯入 ${count} 個作品`, 'success');
+            // 重新初始化 API（載入新設定）
+            if (result.settingsImported) {
+                geminiAPI.apiKey = localStorage.getItem('gemini_api_key') || '';
+                geminiAPI.models = {
+                    story: localStorage.getItem('gemini_model_story') || 'gemini-2.5-flash-lite',
+                    options: localStorage.getItem('gemini_model_options') || 'gemini-2.5-flash-lite',
+                    memory: localStorage.getItem('gemini_model_memory') || 'gemini-2.5-flash-lite'
+                };
+            }
+
+            // 構建結果訊息
+            let resultMessage = `匯入完成！\n`;
+            resultMessage += `• 作品：${result.projectsImported} 個匯入`;
+            if (result.projectsSkipped > 0) {
+                resultMessage += `，${result.projectsSkipped} 個跳過（已存在）`;
+            }
+            if (result.settingsImported) {
+                resultMessage += `\n• 設定：已匯入`;
+            }
+            if (result.embeddingsFailed > 0) {
+                resultMessage += `\n• 向量記憶：${result.embeddingsImported} 成功，${result.embeddingsFailed} 失敗（可重新生成）`;
+            }
+
+            ui.toast(resultMessage, result.errors.length > 0 ? 'warning' : 'success');
 
             // 重新載入首頁
             await this.loadProjects();
